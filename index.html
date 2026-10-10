@@ -93,14 +93,16 @@ const PIPED=["https://pipedapi.kavin.rocks","https://pipedapi.adminforge.de","ht
 const INV=["https://inv.nadeko.net","https://invidious.nerdvpn.de"];
 async function tj(u){const ac=new AbortController(),t=setTimeout(()=>ac.abort(),6000);
  try{const r=await fetch(u,{signal:ac.signal});if(!r.ok)throw 0;return await r.json()}finally{clearTimeout(t)}}
+let fails=[];
 async function unofficial(q){
+ fails=[];
  const enc=encodeURIComponent(q);
  for(const b of PIPED){try{const j=await tj(`${b}/search?q=${enc}&filter=videos`);
   const it=(j.items||[]).find(x=>x.url&&/v=([\w-]{11})/.test(x.url));
-  if(it)return{id:it.url.match(/v=([\w-]{11})/)[1],title:it.title}}catch(e){}}
+  if(it)return{id:it.url.match(/v=([\w-]{11})/)[1],title:it.title};fails.push(new URL(b).host+": 該当なし")}catch(e){fails.push(new URL(b).host+": "+(e&&e.name==="AbortError"?"タイムアウト":"接続不可"))}}
  for(const b of INV){try{const j=await tj(`${b}/api/v1/search?q=${enc}&type=video`);
   const it=Array.isArray(j)&&j.find(x=>/^[\w-]{11}$/.test(x.videoId||""));
-  if(it)return{id:it.videoId,title:it.title}}catch(e){}}
+  if(it)return{id:it.videoId,title:it.title};fails.push(new URL(b).host+": 該当なし")}catch(e){fails.push(new URL(b).host+": "+(e&&e.name==="AbortError"?"タイムアウト":"接続不可"))}}
  return null;
 }
 function embed(id){
@@ -116,7 +118,7 @@ async function playYT(s){
  const v=await unofficial(q);
  if(v){embed(v.id);note.textContent=v.title+"（非公式APIで取得）";return}
  $("yt").innerHTML=`<a class="btn alt" style="margin-bottom:12px" href="https://www.youtube.com/results?search_query=${encodeURIComponent(q)}" target="_blank" rel="noopener noreferrer">YouTubeで検索する</a>`;
- note.textContent="非公式APIに接続できませんでした。上のボタンでYouTubeの検索結果を開けます。";
+ note.textContent="非公式APIに接続できませんでした。上のボタンでYouTubeの検索結果を開けます。（"+fails.join(" / ")+"）";
 }
 function closeDetail(){$("ov").classList.remove("on");$("dlg").innerHTML=""}
 $("ov").onclick=e=>{if(e.target===$("ov"))closeDetail()};
