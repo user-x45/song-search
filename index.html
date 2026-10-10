@@ -126,7 +126,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail()});
 function jsonp(u){return new Promise((res,rej)=>{const n="cb"+Date.now();const s=document.createElement("script");
  const cl=()=>{clearTimeout(t);delete window[n];s.remove()};const t=setTimeout(()=>{cl();rej(new Error("timeout"))},8000);
  window[n]=d=>{cl();res(d)};s.onerror=()=>{cl();rej(new Error("blocked"))};s.src=u+"&callback="+n;document.head.appendChild(s)})}
-async function getJSON(u){try{const r=await fetch(u);if(!r.ok)throw 0;return await r.json()}catch(e){return jsonp(u)}}
+let lastErr="";
+async function getJSON(u){let e1="";
+ try{const r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return await r.json()}catch(e){e1="fetch: "+(e&&e.message||e)}
+ try{return await jsonp(u)}catch(e){lastErr=e1+" / jsonp: "+(e&&e.message||e);throw e}}
 async function run(){
  const q=$("q").value.trim(),c=$("c").value,my=++seq;
  if(!q){all=[];genre="";setStatus("","");return msg("曲名やアーティスト名を入力してください")}
@@ -142,7 +145,7 @@ async function run(){
   genre="";setStatus("live",`ライブ検索結果 ${all.length} 件（${C[c]}）`);chips();draw();
  }catch(e){
   if(my!==seq)return;all=[];
-  setStatus("err","APIに接続できませんでした");msg("iTunes Search APIに接続できません。ネットワーク設定や拡張機能をご確認ください。");
+  setStatus("err","APIに接続できませんでした");msg("iTunes Search APIに接続できません。ネットワーク設定や拡張機能をご確認ください。（"+lastErr+"）");
  }
 }
 $("q").oninput=()=>{clearTimeout(timer);timer=setTimeout(run,300)};
