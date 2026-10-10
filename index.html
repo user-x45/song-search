@@ -46,7 +46,7 @@ audio{width:100%;margin-bottom:12px}
 <body>
 <main>
 <h1>🌍 World Song Search</h1>
-<p class="sub">世界中の楽曲を入力しながらリアルタイム検索（iTunes Search API）</p>
+<p class="sub">世界中の楽曲を入力しながらリアルタイム検索（iTunes / Deezer）</p>
 <div class="bar">
 <input id="q" type="search" placeholder="曲名・アーティスト名で検索" autocomplete="off">
 <select id="c"></select>
@@ -83,7 +83,7 @@ $("g").onclick=e=>{const b=e.target.closest(".item");if(b)openDetail(shown[b.dat
 function dur(ms){if(!ms)return"";const s=Math.round(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
 function openDetail(s){
  const rows=[["アルバム",s.album],["ジャンル",s.genre],["リリース日",s.date],["再生時間",dur(s.ms)],["トラック",s.track&&s.tracks?`${s.track} / ${s.tracks}`:""],["ストア国",s.country],["価格",s.price],["表現",s.explicit]].filter(r=>r[1]);
- const img=s.art?`<img src="${esc(s.art.replace("100x100","600x600"))}" alt="" onerror="this.outerHTML='<div class=big>♪</div>'">`:`<div class="big" style="background:hsl(${hue(s.title)},55%,50%)">♪</div>`;
+ const img=s.art?`<img src="${esc(s.art2||s.art.replace("100x100","600x600"))}" alt="" onerror="this.outerHTML='<div class=big>♪</div>'">`:`<div class="big" style="background:hsl(${hue(s.title)},55%,50%)">♪</div>`;
  const link=safeUrl(s.url);
  $("dlg").innerHTML=`<button class="x" id="cl" aria-label="閉じる">✕</button>${img}<h2>${esc(s.title)}</h2><p class="ar">${esc(s.artist)}</p><dl>${rows.map(r=>`<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join("")}</dl>${safeUrl(s.prev)?`<audio controls autoplay src="${esc(s.prev)}"></audio>`:""}<div class="yt" id="yt"></div><div class="btns"><button class="btn alt" id="ytb">▶ YouTubeで再生</button>${link?`<a class="btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Apple Musicで開く</a>`:""}</div><p class="note" id="ytn"></p>`;
  $("ov").classList.add("on");$("cl").onclick=closeDetail;
@@ -134,18 +134,33 @@ async function run(){
  const q=$("q").value.trim(),c=$("c").value,my=++seq;
  if(!q){all=[];genre="";setStatus("","");return msg("曲名やアーティスト名を入力してください")}
  setStatus("","検索中…");
+ const enc=encodeURIComponent(q);let list,src,err1="";
  try{
-  const j=await getJSON(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=40&country=${c}`);
+  try{
+   const r=await fetch(`https://itunes.apple.com/search?term=${enc}&media=music&entity=song&limit=40&country=${c}`);
+   if(!r.ok)throw new Error("HTTP "+r.status);
+   const j=await r.json();if(!j||!j.results)throw new Error("bad response");
+   list=j.results.map(x=>({title:x.trackName,artist:x.artistName,album:x.collectionName,genre:x.primaryGenreName||"",
+    year:(x.releaseDate||"").slice(0,4),date:x.releaseDate?new Date(x.releaseDate).toLocaleDateString("ja-JP"):"",
+    ms:x.trackTimeMillis,track:x.trackNumber,tracks:x.trackCount,country:x.country,
+    price:x.trackPrice>0?`${x.trackPrice} ${x.currency||""}`:"",explicit:x.trackExplicitness==="explicit"?"露骨な表現あり":"",
+    art:safeUrl(x.artworkUrl100),prev:x.previewUrl,url:x.trackViewUrl}));
+   src=`iTunes・${C[c]}`;
+  }catch(e1){
+   err1="iTunes: "+(e1&&e1.message||e1);
+   const j=await jsonp(`https://api.deezer.com/search?q=${enc}&limit=40&output=jsonp`);
+   if(!j||j.error||!j.data)throw new Error("Deezer: "+((j&&j.error&&j.error.message)||"bad response"));
+   list=j.data.map(x=>({title:x.title,artist:x.artist&&x.artist.name,album:x.album&&x.album.title,genre:"",year:"",date:"",
+    ms:(x.duration||0)*1000,track:0,tracks:0,country:"",price:"",explicit:x.explicit_lyrics?"露骨な表現あり":"",
+    art:safeUrl(x.album&&x.album.cover_medium),art2:safeUrl(x.album&&x.album.cover_xl),prev:safeUrl(x.preview),url:safeUrl(x.link)}));
+   src="Deezer（iTunesに接続できないため代替・国指定なし）";
+  }
   if(my!==seq)return;
-  all=j.results.map(x=>({title:x.trackName,artist:x.artistName,album:x.collectionName,genre:x.primaryGenreName||"",
-   year:(x.releaseDate||"").slice(0,4),date:x.releaseDate?new Date(x.releaseDate).toLocaleDateString("ja-JP"):"",
-   ms:x.trackTimeMillis,track:x.trackNumber,tracks:x.trackCount,country:x.country,
-   price:x.trackPrice>0?`${x.trackPrice} ${x.currency||""}`:"",explicit:x.trackExplicitness==="explicit"?"露骨な表現あり":"",
-   art:safeUrl(x.artworkUrl100),prev:x.previewUrl,url:x.trackViewUrl}));
-  genre="";setStatus("live",`ライブ検索結果 ${all.length} 件（${C[c]}）`);chips();draw();
+  all=list;genre="";setStatus("live",`ライブ検索結果 ${all.length} 件（${src}）`);chips();draw();
  }catch(e){
   if(my!==seq)return;all=[];
-  setStatus("err","APIに接続できませんでした");msg("iTunes Search APIに接続できません。ネットワーク設定や拡張機能をご確認ください。（"+lastErr+"）");
+  setStatus("err","APIに接続できませんでした");
+  msg("音楽検索APIに接続できません。（"+err1+" / "+(e&&e.message||e)+"）");
  }
 }
 $("q").oninput=()=>{clearTimeout(timer);timer=setTimeout(run,300)};
