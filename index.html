@@ -1,16 +1,151 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <script type="text/javascript" src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>World Song Search</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1d1d1f;--sub:#6b6b70;--ac:#e5484d;--bd:#e4e2dc;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141416;--card:#1f1f23;--tx:#f2f2f3;--sub:#9a9aa1;--bd:#2d2d33}}
+:root[data-theme="dark"]{--bg:#141416;--card:#1f1f23;--tx:#f2f2f3;--sub:#9a9aa1;--bd:#2d2d33}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 4px}.sub{color:var(--sub);font-size:13px;margin:0 0 16px}
+.bar{display:flex;gap:8px;flex-wrap:wrap}
+input,select{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px}
+input{flex:1 1 220px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.chip{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:99px;padding:6px 12px;font-size:13px;cursor:pointer}
+.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.status{font-size:12px;color:var(--sub);margin:4px 0 12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#999;margin-right:6px}.dot.live{background:#2fb344}.dot.err{background:var(--ac)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.item{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px;cursor:pointer;text-align:left;color:inherit;font:inherit;width:100%}
+.item:hover{border-color:var(--ac)}
+.art{width:56px;height:56px;border-radius:10px;flex:none;display:grid;place-items:center;font-size:24px;color:#fff;background-size:cover;background-position:center}
+.t{font-weight:600;font-size:14px;line-height:1.3}.a{font-size:13px;color:var(--sub)}.m{font-size:11px;color:var(--sub);margin-top:2px}
+.info{min-width:0;flex:1}
+.empty{text-align:center;color:var(--sub);padding:40px 0;grid-column:1/-1}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+.ov.on{display:flex}
+.dlg{background:var(--card);border-radius:18px;max-width:420px;width:100%;max-height:100%;overflow:auto;padding:18px;position:relative}
+.dlg img,.dlg .big{width:100%;aspect-ratio:1;border-radius:14px;object-fit:cover;display:grid;place-items:center;font-size:64px;color:#fff;background:var(--bd)}
+.dlg h2{font-size:19px;margin:14px 0 2px}.dlg .ar{color:var(--sub);margin:0 0 12px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;margin:0 0 14px}
+dt{color:var(--sub)}dd{margin:0;word-break:break-word}
+audio{width:100%;margin-bottom:12px}
+.btn{display:inline-block;background:var(--ac);color:#fff;text-decoration:none;border-radius:10px;padding:10px 14px;font-size:14px}
+.x{position:absolute;top:10px;right:10px;border:0;background:rgba(0,0,0,.55);color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;z-index:1}
+.btns{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;cursor:pointer;font:inherit;font-size:14px}.btn.alt{background:#d00}
+.yt iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;margin-bottom:12px}
+.note{font-size:12px;color:var(--sub);margin:10px 0 0;word-break:break-word}.note:empty{display:none}
+.status a{color:var(--ac)}
+</style>
 </head>
 <body>
-    <h1>曲検索アプリ</h1>
-    <input id="serch_keyword" type="text"><input id="serch_button" type="button" value="検索">
-    <div class="result"></div><!--ここに検索結果を表示します-->
-    <script type="text/javascript" src="script.js"></script>
+<main>
+<h1>🌍 World Song Search</h1>
+<p class="sub">世界中の楽曲を入力しながらリアルタイム検索（iTunes Search API）</p>
+<div class="bar">
+<input id="q" type="search" placeholder="曲名・アーティスト名で検索" autocomplete="off">
+<select id="c"></select>
+</div>
+<div class="chips" id="chips"></div>
+<div class="status" id="st"></div>
+<div class="grid" id="g"></div>
+</main>
+<div class="ov" id="ov"><div class="dlg" id="dlg"></div></div>
+<script>
+const C={US:"🇺🇸 アメリカ",JP:"🇯🇵 日本",GB:"🇬🇧 イギリス",KR:"🇰🇷 韓国",BR:"🇧🇷 ブラジル",FR:"🇫🇷 フランス",DE:"🇩🇪 ドイツ",SE:"🇸🇪 スウェーデン",IN:"🇮🇳 インド",NG:"🇳🇬 ナイジェリア",CO:"🇨🇴 コロンビア",MX:"🇲🇽 メキシコ",ES:"🇪🇸 スペイン",IT:"🇮🇹 イタリア",AU:"🇦🇺 オーストラリア",CA:"🇨🇦 カナダ",TH:"🇹🇭 タイ",TR:"🇹🇷 トルコ",ZA:"🇿🇦 南アフリカ"};
+const $=id=>document.getElementById(id);
+let all=[],shown=[],genre="",timer,seq=0;
+$("c").innerHTML=Object.entries(C).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");
+$("c").value="JP";
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hue=s=>[...s].reduce((a,c)=>a+c.charCodeAt(0),0)%360;
+const safeUrl=u=>/^https:\/\//.test(u||"")?u:"";
+function setStatus(kind,text){$("st").innerHTML=`<span class="dot ${kind||""}"></span>${esc(text)}`}
+function msg(t){$("g").innerHTML=`<div class="empty">${esc(t)}</div>`;$("chips").innerHTML=""}
+function chips(){
+ const gs=[...new Set(all.map(s=>s.genre).filter(Boolean))];
+ $("chips").innerHTML=gs.length>1?["すべて",...gs].map((g,i)=>`<button class="chip${(i?g:"")===genre?" on":""}" data-g="${i?esc(g):""}">${esc(g)}</button>`).join(""):"";
+}
+$("chips").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;genre=b.dataset.g;chips();draw()};
+function draw(){
+ shown=genre?all.filter(s=>s.genre===genre):all;
+ if(!shown.length)return msg("該当する曲が見つかりません");
+ $("g").innerHTML=shown.map((s,i)=>{
+  const bg=s.art?`background-image:url('${esc(s.art)}')`:`background:hsl(${hue(s.title)},55%,50%)`;
+  return `<button class="item" data-i="${i}"><div class="art" style="${bg}">${s.art?"":"♪"}</div><div class="info"><div class="t">${esc(s.title)}</div><div class="a">${esc(s.artist)}</div><div class="m">${esc(s.genre)}${s.year?" · "+esc(s.year):""}</div></div></button>`}).join("");
+}
+$("g").onclick=e=>{const b=e.target.closest(".item");if(b)openDetail(shown[b.dataset.i])};
+function dur(ms){if(!ms)return"";const s=Math.round(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
+function openDetail(s){
+ const rows=[["アルバム",s.album],["ジャンル",s.genre],["リリース日",s.date],["再生時間",dur(s.ms)],["トラック",s.track&&s.tracks?`${s.track} / ${s.tracks}`:""],["ストア国",s.country],["価格",s.price],["表現",s.explicit]].filter(r=>r[1]);
+ const img=s.art?`<img src="${esc(s.art.replace("100x100","600x600"))}" alt="" onerror="this.outerHTML='<div class=big>♪</div>'">`:`<div class="big" style="background:hsl(${hue(s.title)},55%,50%)">♪</div>`;
+ const link=safeUrl(s.url);
+ $("dlg").innerHTML=`<button class="x" id="cl" aria-label="閉じる">✕</button>${img}<h2>${esc(s.title)}</h2><p class="ar">${esc(s.artist)}</p><dl>${rows.map(r=>`<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join("")}</dl>${safeUrl(s.prev)?`<audio controls autoplay src="${esc(s.prev)}"></audio>`:""}<div class="yt" id="yt"></div><div class="btns"><button class="btn alt" id="ytb">▶ YouTubeで再生</button>${link?`<a class="btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Apple Musicで開く</a>`:""}</div><p class="note" id="ytn"></p>`;
+ $("ov").classList.add("on");$("cl").onclick=closeDetail;
+ $("ytb").onclick=()=>playYT(s);
+}
+const PIPED=["https://pipedapi.kavin.rocks","https://pipedapi.adminforge.de","https://api.piped.private.coffee"];
+const INV=["https://inv.nadeko.net","https://invidious.nerdvpn.de"];
+async function tj(u){const ac=new AbortController(),t=setTimeout(()=>ac.abort(),6000);
+ try{const r=await fetch(u,{signal:ac.signal});if(!r.ok)throw 0;return await r.json()}finally{clearTimeout(t)}}
+async function unofficial(q){
+ const enc=encodeURIComponent(q);
+ for(const b of PIPED){try{const j=await tj(`${b}/search?q=${enc}&filter=videos`);
+  const it=(j.items||[]).find(x=>x.url&&/v=([\w-]{11})/.test(x.url));
+  if(it)return{id:it.url.match(/v=([\w-]{11})/)[1],title:it.title}}catch(e){}}
+ for(const b of INV){try{const j=await tj(`${b}/api/v1/search?q=${enc}&type=video`);
+  const it=Array.isArray(j)&&j.find(x=>/^[\w-]{11}$/.test(x.videoId||""));
+  if(it)return{id:it.videoId,title:it.title}}catch(e){}}
+ return null;
+}
+function embed(id){
+ const eid=encodeURIComponent(id);
+ if(location.protocol==="file:"){
+  $("yt").innerHTML=`<p class="note" style="margin:0 0 12px">file:// で開いているため、YouTubeの埋め込みはエラー153で再生できません。下のボタンでYouTubeを開くか、http://localhost で開いてください。</p><a class="btn alt" style="margin-bottom:12px" href="https://www.youtube.com/watch?v=${eid}" target="_blank" rel="noopener noreferrer">YouTubeで動画を見る</a>`;
+  return}
+ $("yt").innerHTML=`<iframe src="https://www.youtube.com/embed/${eid}?autoplay=1" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`}
+async function playYT(s){
+ const note=$("ytn"),q=s.artist+" "+s.title,a=document.querySelector("#dlg audio");
+ if(a)a.pause();
+ note.textContent="非公式API（Piped / Invidious）で検索中…";
+ const v=await unofficial(q);
+ if(v){embed(v.id);note.textContent=v.title+"（非公式APIで取得）";return}
+ $("yt").innerHTML=`<a class="btn alt" style="margin-bottom:12px" href="https://www.youtube.com/results?search_query=${encodeURIComponent(q)}" target="_blank" rel="noopener noreferrer">YouTubeで検索する</a>`;
+ note.textContent="非公式APIに接続できませんでした。上のボタンでYouTubeの検索結果を開けます。";
+}
+function closeDetail(){$("ov").classList.remove("on");$("dlg").innerHTML=""}
+$("ov").onclick=e=>{if(e.target===$("ov"))closeDetail()};
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail()});
+function jsonp(u){return new Promise((res,rej)=>{const n="cb"+Date.now();const s=document.createElement("script");
+ const cl=()=>{clearTimeout(t);delete window[n];s.remove()};const t=setTimeout(()=>{cl();rej(new Error("timeout"))},8000);
+ window[n]=d=>{cl();res(d)};s.onerror=()=>{cl();rej(new Error("blocked"))};s.src=u+"&callback="+n;document.head.appendChild(s)})}
+async function getJSON(u){try{const r=await fetch(u);if(!r.ok)throw 0;return await r.json()}catch(e){return jsonp(u)}}
+async function run(){
+ const q=$("q").value.trim(),c=$("c").value,my=++seq;
+ if(!q){all=[];genre="";setStatus("","");return msg("曲名やアーティスト名を入力してください")}
+ setStatus("","検索中…");
+ try{
+  const j=await getJSON(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=40&country=${c}`);
+  if(my!==seq)return;
+  all=j.results.map(x=>({title:x.trackName,artist:x.artistName,album:x.collectionName,genre:x.primaryGenreName||"",
+   year:(x.releaseDate||"").slice(0,4),date:x.releaseDate?new Date(x.releaseDate).toLocaleDateString("ja-JP"):"",
+   ms:x.trackTimeMillis,track:x.trackNumber,tracks:x.trackCount,country:x.country,
+   price:x.trackPrice>0?`${x.trackPrice} ${x.currency||""}`:"",explicit:x.trackExplicitness==="explicit"?"露骨な表現あり":"",
+   art:safeUrl(x.artworkUrl100),prev:x.previewUrl,url:x.trackViewUrl}));
+  genre="";setStatus("live",`ライブ検索結果 ${all.length} 件（${C[c]}）`);chips();draw();
+ }catch(e){
+  if(my!==seq)return;all=[];
+  setStatus("err","APIに接続できませんでした");msg("iTunes Search APIに接続できません。ネットワーク設定や拡張機能をご確認ください。");
+ }
+}
+$("q").oninput=()=>{clearTimeout(timer);timer=setTimeout(run,300)};
+$("c").onchange=run;
+run();
+</script>
 </body>
 </html>
